@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import {getAuth} from "firebase/auth";
 
 // Traemos las llaves desde el archivo seguro oculto
 const firebaseConfig = {
@@ -16,3 +17,4 @@ const app = initializeApp(firebaseConfig);
 
 // Inicializamos la Base de Datos y la exportamos para usarla en el catálogo
 export const db = getFirestore(app);
+export const auth = getAuth(app);
