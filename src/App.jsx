@@ -6,14 +6,13 @@ import { auth } from './firebase';
 import Catalogo from './Catalogo';
 import Admin from './Admin';
 import Login from './Login';
+import { MainLayout } from './components/MainLayout'; // Importamos el Layout
+import { AsignarCaja } from './components/AsignarCaja';
 
-// Este componente es un "Guardián". Envuelve a los componentes privados.
 const RutaProtegida = ({ children, usuario }) => {
-  // Si no hay usuario autenticado, lo mandamos al login
   if (!usuario) {
     return <Navigate to="/login" />;
   }
-  // Si está autenticado, lo dejamos pasar al componente hijo (el panel)
   return children;
 };
 
@@ -21,7 +20,6 @@ function App() {
   const [usuario, setUsuario] = useState(null);
   const [revisandoSesion, setRevisandoSesion] = useState(true);
 
-  // useEffect vigila constantemente el estado de autenticación en Firebase
   useEffect(() => {
     const cancelarSuscripcion = onAuthStateChanged(auth, (usuarioActual) => {
       setUsuario(usuarioActual);
@@ -31,7 +29,6 @@ function App() {
     return () => cancelarSuscripcion();
   }, []);
 
-  // Muestra una pantalla en blanco mientras Firebase nos confirma si hay sesión activa
   if (revisandoSesion) {
     return <div className="min-h-screen bg-gray-50"></div>;
   }
@@ -39,19 +36,31 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Rutas Públicas */}
-        <Route path="/" element={<Catalogo />} />
-        <Route path="/login" element={<Login />} />
-        
-        {/* Ruta Privada (Protegida) */}
-        <Route 
-          path="/admin" 
-          element={
-            <RutaProtegida usuario={usuario}>
-              <Admin />
-            </RutaProtegida>
-          } 
-        />
+        <Route element={<MainLayout />}>
+          
+          <Route path="/" element={<Catalogo />} />
+          <Route path="/login" element={<Login />} />
+          
+          <Route 
+            path="/admin" 
+            element={
+              <RutaProtegida usuario={usuario}>
+                <Admin />
+              </RutaProtegida>
+            } 
+          />
+
+          {/* <-- NUEVA RUTA PROTEGIDA PARA EL ALMACÉN --> */}
+          <Route 
+            path="/admin/asignar-caja" 
+            element={
+              <RutaProtegida usuario={usuario}>
+                <AsignarCaja />
+              </RutaProtegida>
+            } 
+          />
+          
+        </Route>
       </Routes>
     </BrowserRouter>
   );
