@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BarcodeScanner } from './BarcodeScanner';
 
 export function FormularioMedicamento({ onGuardar, inventario = [] }) {
   const navigate = useNavigate();
@@ -8,7 +7,6 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
   const [nombre, setNombre] = useState('');
   const [gramaje, setGramaje] = useState('');
   const [presentacion, setPresentacion] = useState('');
-  const [imagen, setImagen] = useState('');
 
   const [codigoBarras, setCodigoBarras] = useState('');
   const [fechaCaducidad, setFechaCaducidad] = useState('');
@@ -18,9 +16,8 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
 
   const [guardando, setGuardando] = useState(false);
   const [esConocido, setEsConocido] = useState(false);
-  const [mostrandoScanner, setMostrandoScanner] = useState(false);
 
-  // === CALCULADORA DE FECHA MÍNIMA ===
+  // Fecha mínima: primer día del mes siguiente
   const obtenerMinimaFechaPermitida = () => {
     const hoy = new Date();
     let mesSiguiente = hoy.getMonth() + 2;
@@ -32,19 +29,17 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
     return `${anio}-${mesSiguiente.toString().padStart(2, '0')}-01`;
   };
 
+  // Autocompletado por código de barras
   useEffect(() => {
     if (!codigoBarras || codigoBarras.length < 3) {
       if (esConocido) setEsConocido(false);
       return;
     }
-
     const medicamentoEncontrado = inventario.find(med => med.codigo_barras === codigoBarras);
-
     if (medicamentoEncontrado) {
       setNombre(medicamentoEncontrado.nombre || '');
       setGramaje(medicamentoEncontrado.gramaje || '');
       setPresentacion(medicamentoEncontrado.presentacion || '');
-      setImagen(medicamentoEncontrado.imagen || '');
       setCantidadPiezas(medicamentoEncontrado.cantidad_piezas?.toString() || '');
       setLimiteAnaquel(medicamentoEncontrado.limite_anaquel?.toString() || '20');
       setEsConocido(true);
@@ -57,33 +52,28 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
     e.preventDefault();
     setGuardando(true);
 
+    // Validación de caducidad
     const [anioCad, mesCad] = fechaCaducidad.split('-');
     const expYear = parseInt(anioCad, 10);
     const expMonth = parseInt(mesCad, 10) - 1;
-
     const hoy = new Date();
-    const currentYear = hoy.getFullYear();
-    const currentMonth = hoy.getMonth();
-
-    if (expYear < currentYear || (expYear === currentYear && expMonth <= currentMonth)) {
+    if (expYear < hoy.getFullYear() || (expYear === hoy.getFullYear() && expMonth <= hoy.getMonth())) {
       alert("❌ ALERTA DE SEGURIDAD: No se puede ingresar este lote. El medicamento ya está caducado o caduca este mismo mes.");
       setGuardando(false);
       return;
     }
 
     const cantidadAInsertar = Number(multiplicadorCajas);
-
-    const resultado = await onGuardar({ 
-      nombre, 
-      gramaje, 
-      presentacion, 
-      imagen,
+    const resultado = await onGuardar({
+      nombre,
+      gramaje,
+      presentacion,
       codigo_barras: codigoBarras,
       fecha_caducidad: fechaCaducidad,
       cantidad_piezas: Number(cantidadPiezas),
       limite_anaquel: Number(limiteAnaquel)
     }, cantidadAInsertar);
-    
+
     if (resultado && resultado.exito) {
       if (resultado.requiereAlmacen) {
         navigate('/admin/asignar-caja', {
@@ -93,7 +83,7 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
           }
         });
       } else {
-        setNombre(''); setGramaje(''); setPresentacion(''); setImagen('');
+        setNombre(''); setGramaje(''); setPresentacion('');
         setCodigoBarras(''); setFechaCaducidad(''); setCantidadPiezas('');
         setLimiteAnaquel(''); setMultiplicadorCajas('1'); setEsConocido(false);
         alert("¡Lote registrado en anaquel exitosamente!");
@@ -101,14 +91,8 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
     } else {
       alert("Hubo un error crítico al procesar el lote.");
     }
-    
     setGuardando(false);
   };
-
-  const manejarEscaneo = useCallback((codigo) => {
-    setCodigoBarras(codigo);
-    setMostrandoScanner(false);
-  }, []);
 
   const inputClass = "w-full p-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors";
   const normalInput = `${inputClass} border-gray-300 bg-white`;
@@ -126,77 +110,64 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
       </div>
 
       <form onSubmit={manejarEnvio} className="space-y-4">
-        
         <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-          <label className="block text-xs font-bold text-yellow-800 mb-1">
-            Código de Barras
-          </label>
-          <div className="flex gap-2">
-            <input 
-              type="text" 
-              required 
-              value={codigoBarras} 
-              onChange={(e) => setCodigoBarras(e.target.value)} 
-              className={`flex-1 ${inputClass} border-yellow-300 shadow-inner`} 
-              placeholder="Ej. 750123456789" 
-              autoFocus
-            />
-            <button
-              type="button"
-              onClick={() => setMostrandoScanner(true)}
-              className="px-3 py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 rounded-lg font-bold transition flex items-center gap-1 text-sm"
-              title="Escanear con cámara"
-            >
-              📷
-            </button>
-          </div>
+          <label className="block text-xs font-bold text-yellow-800 mb-1">Código de Barras</label>
+          <input
+            type="text"
+            required
+            value={codigoBarras}
+            onChange={(e) => setCodigoBarras(e.target.value)}
+            className={`${inputClass} border-yellow-300 shadow-inner`}
+            placeholder="Ej. 750123456789"
+            autoFocus
+          />
         </div>
 
-        {/* Resto del formulario sin cambios */}
         <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
           <h3 className="text-xs font-bold text-gray-600 uppercase">Información del Catálogo</h3>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Nombre</label>
-            <input type="text" required value={nombre} onChange={(e) => setNombre(e.target.value)} readOnly={esConocido} className={esConocido ? lockedInput : normalInput} placeholder="Ej. Paracetamol" />
+            <input type="text" required value={nombre} onChange={(e) => setNombre(e.target.value)}
+              readOnly={esConocido} className={esConocido ? lockedInput : normalInput} placeholder="Ej. Paracetamol" />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Gramaje</label>
-              <input type="text" required value={gramaje} onChange={(e) => setGramaje(e.target.value)} readOnly={esConocido} className={esConocido ? lockedInput : normalInput} placeholder="500mg" />
+              <input type="text" required value={gramaje} onChange={(e) => setGramaje(e.target.value)}
+                readOnly={esConocido} className={esConocido ? lockedInput : normalInput} placeholder="500mg" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Presentación</label>
-              <input type="text" required value={presentacion} onChange={(e) => setPresentacion(e.target.value)} readOnly={esConocido} className={esConocido ? lockedInput : normalInput} placeholder="Tabletas" />
+              <input type="text" required value={presentacion} onChange={(e) => setPresentacion(e.target.value)}
+                readOnly={esConocido} className={esConocido ? lockedInput : normalInput} placeholder="Tabletas" />
             </div>
           </div>
         </div>
 
         <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
           <h3 className="text-xs font-bold text-gray-600 uppercase">Datos Logísticos</h3>
-          
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Cant. Pastillas/Ml</label>
-              <input type="number" required value={cantidadPiezas} onChange={(e) => setCantidadPiezas(e.target.value)} readOnly={esConocido} className={esConocido ? lockedInput : normalInput} placeholder="Ej. 28" min="1" />
+              <input type="number" required value={cantidadPiezas} onChange={(e) => setCantidadPiezas(e.target.value)}
+                readOnly={esConocido} className={esConocido ? lockedInput : normalInput} placeholder="Ej. 28" min="1" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Límite Anaquel</label>
-              <input type="number" required value={limiteAnaquel} onChange={(e) => setLimiteAnaquel(e.target.value)} readOnly={esConocido} className={esConocido ? lockedInput : normalInput} placeholder="Ej. 20" min="1" title="Máximo de cajas permitidas en mostrador" />
+              <input type="number" required value={limiteAnaquel} onChange={(e) => setLimiteAnaquel(e.target.value)}
+                readOnly={esConocido} className={esConocido ? lockedInput : normalInput} placeholder="Ej. 20" min="1" />
             </div>
           </div>
-
-          <div className="grid grid-cols-1 gap-2">
-            <div>
-              <label className="block text-xs text-blue-700 mb-1 font-bold">Fecha de Caducidad de este lote</label>
-              <input 
-                type="date" 
-                required 
-                value={fechaCaducidad} 
-                onChange={(e) => setFechaCaducidad(e.target.value)} 
-                min={obtenerMinimaFechaPermitida()}
-                className={`${normalInput} border-blue-300 ring-1 ring-blue-100`} 
-              />
-            </div>
+          <div>
+            <label className="block text-xs text-blue-700 mb-1 font-bold">Fecha de Caducidad</label>
+            <input
+              type="date"
+              required
+              value={fechaCaducidad}
+              onChange={(e) => setFechaCaducidad(e.target.value)}
+              min={obtenerMinimaFechaPermitida()}
+              className={`${normalInput} border-blue-300 ring-1 ring-blue-100`}
+            />
           </div>
         </div>
 
@@ -204,29 +175,25 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
           <div>
             <label className="block text-sm font-bold text-green-800">Cajas Físicas Recibidas</label>
           </div>
-          <input 
-            type="number" 
-            required 
-            value={multiplicadorCajas} 
-            onChange={(e) => setMultiplicadorCajas(e.target.value)} 
-            className="w-20 p-2 text-lg font-bold text-center text-green-700 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-white" 
-            min="1" 
+          <input
+            type="number"
+            required
+            value={multiplicadorCajas}
+            onChange={(e) => setMultiplicadorCajas(e.target.value)}
+            className="w-20 p-2 text-lg font-bold text-center text-green-700 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none bg-white"
+            min="1"
             max="100"
           />
         </div>
 
-        <button type="submit" disabled={guardando} className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 shadow-md">
+        <button
+          type="submit"
+          disabled={guardando}
+          className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 shadow-md"
+        >
           {guardando ? 'Calculando espacio...' : 'Registrar en Inventario'}
         </button>
       </form>
-
-      {/* Modal del escáner */}
-      {mostrandoScanner && (
-        <BarcodeScanner
-          onScan={manejarEscaneo}
-          onClose={() => setMostrandoScanner(false)}
-        />
-      )}
     </div>
   );
 }
