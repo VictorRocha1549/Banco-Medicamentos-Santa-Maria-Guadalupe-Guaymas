@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import {getAuth} from "firebase/auth";
+import { getAuth, setPersistence, browserSessionPersistence } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 // Traemos las llaves desde el archivo seguro oculto
 const firebaseConfig = {
@@ -18,3 +18,9 @@ const app = initializeApp(firebaseConfig);
 // Inicializamos la Base de Datos y la exportamos para usarla en el catálogo
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+
+// Configurar persistencia de sesión en sessionStorage (se borra al cerrar pestaña)
+setPersistence(auth, browserSessionPersistence)
+  .catch((error) => {
+    console.error('Error al configurar persistencia de sesión:', error);
+  });
