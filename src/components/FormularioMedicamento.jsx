@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { BarcodeScanner } from './BarcodeScanner';
 
 export function FormularioMedicamento({ onGuardar, inventario = [] }) {
   const navigate = useNavigate();
@@ -8,29 +9,26 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
   const [gramaje, setGramaje] = useState('');
   const [presentacion, setPresentacion] = useState('');
   const [imagen, setImagen] = useState('');
-  
+
   const [codigoBarras, setCodigoBarras] = useState('');
   const [fechaCaducidad, setFechaCaducidad] = useState('');
   const [cantidadPiezas, setCantidadPiezas] = useState('');
-  const [limiteAnaquel, setLimiteAnaquel] = useState(''); 
-  const [multiplicadorCajas, setMultiplicadorCajas] = useState('1'); 
-  
+  const [limiteAnaquel, setLimiteAnaquel] = useState('');
+  const [multiplicadorCajas, setMultiplicadorCajas] = useState('1');
+
   const [guardando, setGuardando] = useState(false);
   const [esConocido, setEsConocido] = useState(false);
+  const [mostrandoScanner, setMostrandoScanner] = useState(false);
 
   // === CALCULADORA DE FECHA MÍNIMA ===
-  // Calcula el primer día del mes siguiente para bloquear el calendario
   const obtenerMinimaFechaPermitida = () => {
     const hoy = new Date();
-    let mesSiguiente = hoy.getMonth() + 2; // +1 porque JS es base 0, +1 para brincar al próximo mes
+    let mesSiguiente = hoy.getMonth() + 2;
     let anio = hoy.getFullYear();
-    
     if (mesSiguiente > 12) {
       mesSiguiente = 1;
       anio += 1;
     }
-    
-    // Formatea a YYYY-MM-DD
     return `${anio}-${mesSiguiente.toString().padStart(2, '0')}-01`;
   };
 
@@ -59,24 +57,19 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
     e.preventDefault();
     setGuardando(true);
 
-    // ==========================================
-    // VALIDACIÓN CRÍTICA DE CADUCIDAD
-    // ==========================================
     const [anioCad, mesCad] = fechaCaducidad.split('-');
     const expYear = parseInt(anioCad, 10);
-    const expMonth = parseInt(mesCad, 10) - 1; // JS usa meses del 0 al 11
+    const expMonth = parseInt(mesCad, 10) - 1;
 
     const hoy = new Date();
     const currentYear = hoy.getFullYear();
     const currentMonth = hoy.getMonth();
 
-    // Regla: Si el año es menor, o si es el mismo año pero el mes es igual o menor al actual = Bloqueado
     if (expYear < currentYear || (expYear === currentYear && expMonth <= currentMonth)) {
       alert("❌ ALERTA DE SEGURIDAD: No se puede ingresar este lote. El medicamento ya está caducado o caduca este mismo mes.");
       setGuardando(false);
-      return; // Detenemos el guardado inmediatamente
+      return;
     }
-    // ==========================================
 
     const cantidadAInsertar = Number(multiplicadorCajas);
 
@@ -112,6 +105,11 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
     setGuardando(false);
   };
 
+  const manejarEscaneo = useCallback((codigo) => {
+    setCodigoBarras(codigo);
+    setMostrandoScanner(false);
+  }, []);
+
   const inputClass = "w-full p-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-colors";
   const normalInput = `${inputClass} border-gray-300 bg-white`;
   const lockedInput = `${inputClass} border-blue-200 bg-blue-50 text-blue-800 font-medium cursor-not-allowed`;
@@ -130,18 +128,31 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
       <form onSubmit={manejarEnvio} className="space-y-4">
         
         <div className="bg-yellow-50 p-3 rounded-lg border border-yellow-200">
-          <label className="block text-xs font-bold text-yellow-800 mb-1">Escanear Código de Barras Primero</label>
-          <input 
-            type="text" 
-            required 
-            value={codigoBarras} 
-            onChange={(e) => setCodigoBarras(e.target.value)} 
-            className={`${inputClass} border-yellow-300 shadow-inner`} 
-            placeholder="Ej. 750123456789" 
-            autoFocus
-          />
+          <label className="block text-xs font-bold text-yellow-800 mb-1">
+            Código de Barras
+          </label>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              required 
+              value={codigoBarras} 
+              onChange={(e) => setCodigoBarras(e.target.value)} 
+              className={`flex-1 ${inputClass} border-yellow-300 shadow-inner`} 
+              placeholder="Ej. 750123456789" 
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={() => setMostrandoScanner(true)}
+              className="px-3 py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 rounded-lg font-bold transition flex items-center gap-1 text-sm"
+              title="Escanear con cámara"
+            >
+              📷
+            </button>
+          </div>
         </div>
 
+        {/* Resto del formulario sin cambios */}
         <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-3">
           <h3 className="text-xs font-bold text-gray-600 uppercase">Información del Catálogo</h3>
           <div>
@@ -176,13 +187,13 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
 
           <div className="grid grid-cols-1 gap-2">
             <div>
-              <label className="block text-xs font-medium text-blue-700 mb-1 font-bold">Fecha de Caducidad de este lote</label>
+              <label className="block text-xs text-blue-700 mb-1 font-bold">Fecha de Caducidad de este lote</label>
               <input 
                 type="date" 
                 required 
                 value={fechaCaducidad} 
                 onChange={(e) => setFechaCaducidad(e.target.value)} 
-                min={obtenerMinimaFechaPermitida()} // <--- Bloqueo Visual en el calendario HTML
+                min={obtenerMinimaFechaPermitida()}
                 className={`${normalInput} border-blue-300 ring-1 ring-blue-100`} 
               />
             </div>
@@ -208,6 +219,14 @@ export function FormularioMedicamento({ onGuardar, inventario = [] }) {
           {guardando ? 'Calculando espacio...' : 'Registrar en Inventario'}
         </button>
       </form>
+
+      {/* Modal del escáner */}
+      {mostrandoScanner && (
+        <BarcodeScanner
+          onScan={manejarEscaneo}
+          onClose={() => setMostrandoScanner(false)}
+        />
+      )}
     </div>
   );
 }
