@@ -13,6 +13,7 @@ import { DirectorioPacientes } from './components/DirectorioPacientes';
 import { DetallePaciente } from './components/DetallePaciente';
 import { GestionCajas } from './components/GestionCajas';
 import { SessionManager } from './components/SessionManager';
+import { Reportes } from './components/Reportes';
 
 const RutaProtegida = ({ children, usuario }) => {
   if (!usuario) return <Navigate to="/login" />;
@@ -60,6 +61,9 @@ function App() {
           } />
           <Route path="/admin/cajas" element={
             <RutaProtegida usuario={usuario}><GestionCajas /></RutaProtegida>
+          } />
+          <Route path="/admin/reportes" element={
+            <RutaProtegida usuario={usuario}><Reportes /></RutaProtegida>
           } />
         </Route>
       </Routes>
