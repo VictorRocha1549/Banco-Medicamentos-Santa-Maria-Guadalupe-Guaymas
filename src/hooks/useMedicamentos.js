@@ -44,20 +44,20 @@ export const useMedicamentos = () => {
 
       // 2. Calculamos matemáticamente el espacio
       const espacioDisponible = limiteFisico - cajasExistentesEnAnaquel;
-      
+
       let cajasParaAnaquel = 0;
       let cajasSobrantes = 0;
 
       if (espacioDisponible >= cantidadDeCajas) {
-         // Hay espacio de sobra, todas van al anaquel
-         cajasParaAnaquel = cantidadDeCajas;
+        // Hay espacio de sobra, todas van al anaquel
+        cajasParaAnaquel = cantidadDeCajas;
       } else if (espacioDisponible > 0) {
-         // Hay espacio para algunas, las demás sobran
-         cajasParaAnaquel = espacioDisponible;
-         cajasSobrantes = cantidadDeCajas - espacioDisponible;
+        // Hay espacio para algunas, las demás sobran
+        cajasParaAnaquel = espacioDisponible;
+        cajasSobrantes = cantidadDeCajas - espacioDisponible;
       } else {
-         // El anaquel ya está al máximo
-         cajasSobrantes = cantidadDeCajas; 
+        // El anaquel ya está al máximo
+        cajasSobrantes = cantidadDeCajas;
       }
 
       // 3. Empaquetamos las operaciones de Firebase en un "Lote" (Batch)
@@ -65,12 +65,12 @@ export const useMedicamentos = () => {
       const batch = writeBatch(db);
 
       for (let i = 0; i < cajasParaAnaquel; i++) {
-         const nuevaReferencia = doc(collection(db, "medicamentos"));
-         batch.set(nuevaReferencia, {
-            ...nuevoMedicamento,
-            disponible: true,
-            ubicacion: "anaquel" // Etiqueta oficial de mostrador
-         });
+        const nuevaReferencia = doc(collection(db, "medicamentos"));
+        batch.set(nuevaReferencia, {
+          ...nuevoMedicamento,
+          disponible: true,
+          ubicacion: "anaquel" // Etiqueta oficial de mostrador
+        });
       }
 
       // Ejecutamos el guardado de las que sí cupieron
@@ -80,17 +80,17 @@ export const useMedicamentos = () => {
 
       // 4. Retornamos el veredicto a la interfaz gráfica
       if (cajasSobrantes > 0) {
-         // El sistema intercepta el proceso porque hubo desbordamiento
-         return {
-           exito: true,
-           requiereAlmacen: true,
-           cantidadSobrante: cajasSobrantes,
-           datosMed: { ...nuevoMedicamento, disponible: true, ubicacion: "pendiente_almacen" }
-         };
+        // El sistema intercepta el proceso porque hubo desbordamiento
+        return {
+          exito: true,
+          requiereAlmacen: true,
+          cantidadSobrante: cajasSobrantes,
+          datosMed: { ...nuevoMedicamento, disponible: true, ubicacion: "pendiente_almacen" }
+        };
       }
 
       // Si todo salió bien y cupieron en el anaquel
-      cargarInventario(); 
+      cargarInventario();
       return { exito: true, requiereAlmacen: false };
 
     } catch (error) {
@@ -119,5 +119,27 @@ export const useMedicamentos = () => {
     }
   };
 
-  return { medicamentos, cargando, agregarMedicamento, toggleDisponibilidad, eliminarMedicamento };
+  // === NUEVA FUNCIÓN: Eliminación Masiva de Caducados ===
+  const retirarLoteCaducado = async (arregloIds) => {
+    try {
+      const batch = writeBatch(db);
+
+      // Recorremos todos los IDs de las cajas caducadas y los agregamos a la guillotina
+      arregloIds.forEach(id => {
+        const ref = doc(db, "medicamentos", id);
+        batch.delete(ref);
+      });
+
+      // Ejecutamos la eliminación de todas las cajas en un solo movimiento seguro
+      await batch.commit();
+      cargarInventario();
+      return true;
+    } catch (error) {
+      console.error("Error al retirar el lote caducado:", error);
+      return false;
+    }
+  };
+
+  // No olvides agregar la nueva función al return para que la vista pueda usarla
+  return { medicamentos, cargando, agregarMedicamento, toggleDisponibilidad, eliminarMedicamento, retirarLoteCaducado };
 };
